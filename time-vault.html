@@ -1,0 +1,153 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Emergency Vault</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <style>
+    body { font-family: sans-serif; padding: 2em; text-align: center; }
+    input, textarea, button, select { margin-top: 10px; font-size: 1em; }
+    #vault, #settings { display: none; margin-top: 1.5em; }
+    #password { font-size: 1.2em; color: green; margin-top: 1em; }
+  </style>
+</head>
+<body>
+
+  <h1>Emergency Vault</h1>
+  <p id="storageStatus"></p>
+  <p id="status">Press start to begin the wait timer.</p>
+  <button id="startBtn">Start Timer</button>
+
+  <div id="vault">
+    <p><strong>🔐 Password:</strong></p>
+    <div id="password"></div>
+
+    <textarea id="passwordEdit" rows="3" cols="30"></textarea><br>
+    <button onclick="savePassword()">Save New Password</button>
+  </div>
+
+  <div id="settings">
+    <h3>⏱ Change Wait Time</h3>
+    <label for="waitTime">Minutes:</label>
+    <select id="waitTime">
+      <option>5</option>
+      <option selected>10</option>
+      <option>15</option>
+      <option>30</option>
+    </select>
+    <button onclick="saveWaitTime()">Save Wait Time</button>
+  </div>
+
+  <script>
+    let waitSeconds = parseInt(localStorage.getItem("waitTime")) || 600;
+    const defaultPassword = "MyEmergencyCode";
+    const passwordKey = "vaultPassword";
+
+    let timer = null;
+    let startTime = null;
+
+    const startBtn = document.getElementById("startBtn");
+    const status = document.getElementById("status");
+    const storageStatus = document.getElementById("storageStatus");
+    const passwordDiv = document.getElementById("password");
+    const passwordEdit = document.getElementById("passwordEdit");
+    const vaultDiv = document.getElementById("vault");
+    const settingsDiv = document.getElementById("settings");
+    const waitSelect = document.getElementById("waitTime");
+
+    function isPasswordStored() {
+      return localStorage.getItem(passwordKey) !== null;
+    }
+
+    function updateStorageStatus() {
+      const msg = isPasswordStored()
+        ? "✅ A password is currently stored."
+        : "⚠️ No password stored yet.";
+      storageStatus.textContent = msg;
+    }
+
+    function getStoredPassword() {
+      return localStorage.getItem(passwordKey) || defaultPassword;
+    }
+
+    function revealPassword() {
+      const pw = getStoredPassword();
+      passwordDiv.textContent = pw;
+      passwordEdit.value = pw;
+      vaultDiv.style.display = "block";
+      settingsDiv.style.display = "block";
+    }
+
+    function savePassword() {
+      const newPw = passwordEdit.value;
+      localStorage.setItem(passwordKey, newPw);
+      passwordDiv.textContent = newPw;
+      updateStorageStatus();
+      alert("Password saved.");
+    }
+
+    function saveWaitTime() {
+      const newTime = parseInt(waitSelect.value);
+      localStorage.setItem("waitTime", newTime * 60);
+      waitSeconds = newTime * 60;
+      alert("Wait time updated to " + newTime + " minutes.");
+    }
+
+    function resetTimer(reason) {
+      clearInterval(timer);
+      startTime = null;
+      status.textContent = "Timer reset. Reason: " + reason;
+      vaultDiv.style.display = "none";
+      settingsDiv.style.display = "none";
+      passwordDiv.textContent = "";
+    }
+
+    function startTimer() {
+      if (!isPasswordStored()) {
+        // No password stored: skip timer, show vault immediately
+        status.textContent = "No password found. Skipping timer.";
+        revealPassword();
+        return;
+      }
+
+      if (timer) clearInterval(timer);
+      vaultDiv.style.display = "none";
+      settingsDiv.style.display = "none";
+      passwordDiv.textContent = "";
+      waitSeconds = parseInt(localStorage.getItem("waitTime")) || 600;
+      startTime = Date.now();
+      status.textContent = `Waiting ${waitSeconds} seconds...`;
+
+      timer = setInterval(() => {
+        const elapsed = Math.floor((Date.now() - startTime) / 1000);
+        const remaining = waitSeconds - elapsed;
+
+        if (remaining > 0) {
+          status.textContent = `Waiting ${remaining} seconds…`;
+        } else {
+          clearInterval(timer);
+          status.textContent = "Unlocked.";
+          revealPassword();
+        }
+      }, 1000);
+    }
+
+    window.onload = function() {
+      updateStorageStatus();
+
+      startBtn.addEventListener("click", startTimer);
+
+      document.addEventListener("visibilitychange", () => {
+        if (document.hidden) {
+          resetTimer("App switched or screen locked.");
+        }
+      });
+
+      // Load stored wait time into dropdown
+      const stored = parseInt(localStorage.getItem("waitTime"));
+      if (stored) {
+        waitSelect.value = stored / 60;
+      }
+    };
+  </script>
+</body>
+</html>
